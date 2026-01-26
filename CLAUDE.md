@@ -1,0 +1,119 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+TITrack is a **Torchlight Infinite Local Loot Tracker** - a Windows desktop application that reads game log files to track loot, calculate profit per map run, and display net worth. Inspired by WealthyExile (Path of Exile tracker).
+
+**Key constraints:**
+- Fully local, no cloud/internet required
+- Portable EXE distribution (no Python/Node install needed)
+- Privacy-focused (all data stored locally)
+- No cheating/hooking/memory reading - only parses log files
+
+## Tech Stack
+
+- **Language:** Python 3.11+
+- **Backend:** FastAPI + Uvicorn
+- **Database:** SQLite (WAL mode)
+- **Frontend:** React (or HTML/HTMX for MVP)
+- **Packaging:** PyInstaller (--onedir preferred)
+- **Target:** Windows 10/11
+
+## Build Commands (Planned)
+
+```bash
+# Testing
+pytest tests/                    # Parser unit tests
+pytest tests/e2e/               # End-to-end tests
+
+# Building
+pyinstaller ti_tracker.spec     # Build EXE
+
+# Linting
+black .
+flake8 .
+```
+
+## Architecture
+
+Five main components:
+
+1. **Collector (Log Tailer + Parser)** - Watches TI log file, parses events, computes item deltas
+2. **Local Database (SQLite)** - Stores runs, deltas, slot state, prices, settings
+3. **Price Engine** - Maps ConfigBaseId to price_fe, supports manual edits and import/export
+4. **Local Web UI** - FastAPI serves REST API + static files, opens in browser
+5. **Packaged App** - PyInstaller EXE that starts all services
+
+## Key Data Concepts
+
+- **FE (Flame Elementium):** Primary valuation currency, ConfigBaseId = `100300`
+- **ConfigBaseId:** Integer item type identifier from game logs
+- **Delta tracking:** Logs report absolute stack totals (`Num=`), tracker computes changes vs previous state
+- **Slot state:** Tracked per `(PageId, SlotId)` with current `(ConfigBaseId, Num)`
+
+## Log Parsing
+
+**Source:** `<SteamLibrary>\steamapps\common\Torchlight Infinite\UE_Game\Torchlight\Saved\Logs\UE_game.log`
+
+**Key patterns to parse:**
+
+```text
+# Item pickup block
+GameLog: Display: [Game] ItemChange@ ProtoName=PickItems start
+GameLog: Display: [Game] BagMgr@:Modfy BagItem PageId = 102 SlotId = 0 ConfigBaseId = 100300 Num = 671
+GameLog: Display: [Game] ItemChange@ ProtoName=PickItems end
+
+# Map boundaries
+LevelMgr@ EnterLevel ...
+LevelMgr@ OpenLevel ...
+```
+
+**Parsing rules:**
+- Incremental tail (handle log rotation)
+- Delta = current `Num` - previous `Num` for same slot/item
+- Tag changes inside PickItems block as "pickup-related"
+- Handle unknown ConfigBaseIds gracefully (show as "Unknown <id>")
+
+## Database Schema (Core Tables)
+
+- `settings` - key/value config
+- `runs` - map instances (start_ts, end_ts, zone_sig)
+- `item_deltas` - per-item changes with run_id, context, proto_name
+- `slot_state` - current inventory state per (page_id, slot_id)
+- `items` - item metadata (name, icon_url, category)
+- `prices` - item valuation (price_fe, source, updated_ts)
+
+## Item Database
+
+`tlidb_items_seed_en.json` contains 1,811 items with:
+- `id` (ConfigBaseId as string)
+- `name_en`, `name_cn`
+- `img` (icon URL)
+- `url_en`, `url_cn` (TLIDB links)
+
+Seeds the `items` table on first run.
+
+## File Locations
+
+| File | Purpose |
+|------|---------|
+| `TI_Local_Loot_Tracker_PRD.md` | Complete requirements document |
+| `tlidb_items_seed_en.json` | Item database seed (1,811 items) |
+
+## Storage Locations (Runtime)
+
+- Default: `%LOCALAPPDATA%\TITracker\tracker.db`
+- Portable mode: `.\data\tracker.db` beside exe
+
+## MVP Requirements
+
+1. Select & persist log file path
+2. Tail log, parse PickItems + BagMgr updates
+3. Compute deltas, store in DB
+4. Segment runs (EnterLevel-based boundaries)
+5. Display FE gained per run, profit/hr
+6. Editable price list with import/export
+7. Net worth from latest inventory
+8. Packaged portable EXE
