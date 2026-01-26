@@ -62,8 +62,8 @@ class RunSegmenter:
         ended_run: Optional[Run] = None
         new_run: Optional[Run] = None
 
-        # Only EnterLevel triggers run transitions
-        if event.event_type != "EnterLevel":
+        # Only OpenMainWorld triggers run transitions (actual game format)
+        if event.event_type != "OpenMainWorld":
             return None, None
 
         zone_sig = event.level_info

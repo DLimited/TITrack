@@ -11,6 +11,7 @@ from typing import Optional
 from titrack.collector.collector import Collector
 from titrack.config.settings import Settings, find_log_file
 from titrack.core.models import Item, ItemDelta, Run
+from titrack.data.zones import get_zone_display_name
 from titrack.db.connection import Database
 from titrack.db.repository import Repository
 from titrack.parser.patterns import FE_CONFIG_BASE_ID
@@ -27,7 +28,8 @@ def print_delta(delta: ItemDelta, repo: Repository) -> None:
 def print_run_start(run: Run) -> None:
     """Print run start to console."""
     hub_str = " (hub)" if run.is_hub else ""
-    print(f"\n=== Entered: {run.zone_signature}{hub_str} ===")
+    zone_name = get_zone_display_name(run.zone_signature)
+    print(f"\n=== Entered: {zone_name}{hub_str} ===")
 
 
 def print_run_end(run: Run, repo: Repository) -> None:
@@ -275,8 +277,9 @@ def cmd_show_runs(args: argparse.Namespace) -> int:
         fe_gained = summary.get(FE_CONFIG_BASE_ID, 0)
 
         hub_str = "[hub] " if run.is_hub else ""
+        zone_name = get_zone_display_name(run.zone_signature)
         print(
-            f"  #{run.id:3} {hub_str}{run.zone_signature[:30]:<30} "
+            f"  #{run.id:3} {hub_str}{zone_name[:30]:<30} "
             f"{duration_str:>10} FE: {fe_gained:+d}"
         )
 

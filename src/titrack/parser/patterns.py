@@ -22,20 +22,28 @@ ITEM_CHANGE_PATTERN = re.compile(
 )
 
 # Level transition events
-# Example: LevelMgr@ EnterLevel <level_info>
-# Example: LevelMgr@ OpenLevel <level_info>
+# Actual format from game logs:
+# SceneLevelMgr@ OpenMainWorld END! InMainLevelPath = /Game/Art/Maps/04DD/DD_ShengTingZhuangYuan000/...
 LEVEL_EVENT_PATTERN = re.compile(
-    r"LevelMgr@\s+(?P<event_type>EnterLevel|OpenLevel)\s+(?P<level_info>.+)"
+    r"SceneLevelMgr@\s+(?P<event_type>OpenMainWorld)\s+END!\s+"
+    r"InMainLevelPath\s*=\s*(?P<level_info>.+)"
 )
 
 # Known hub/town zone patterns (for run segmentation)
 # These patterns identify non-mapping zones
+# Map paths look like: /Game/Art/Maps/01SD/XZ_YuJinZhiXiBiNanSuo200/...
+# Hub/hideout codes: 01SD (Ember's Rest hideout), 04DD, etc.
 HUB_ZONE_PATTERNS = [
     re.compile(r"hideout", re.IGNORECASE),
     re.compile(r"town", re.IGNORECASE),
     re.compile(r"hub", re.IGNORECASE),
     re.compile(r"lobby", re.IGNORECASE),
     re.compile(r"social", re.IGNORECASE),
+    re.compile(r"/01SD/", re.IGNORECASE),  # Ember's Rest hideout
+    re.compile(r"/04DD/", re.IGNORECASE),  # Another hideout variant
+    re.compile(r"YuJinZhiXiBiNanSuo", re.IGNORECASE),  # Ember's Rest (Chinese name)
+    re.compile(r"ShengTingZhuangYuan", re.IGNORECASE),  # Sacred Court Manor (hideout)
+    re.compile(r"ZhuCheng", re.IGNORECASE),  # Main city
 ]
 
 # Flame Elementium ConfigBaseId (primary currency)

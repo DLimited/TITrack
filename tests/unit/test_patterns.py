@@ -75,25 +75,24 @@ class TestItemChangePattern:
 class TestLevelEventPattern:
     """Tests for level transition event pattern."""
 
-    def test_matches_enter_level(self):
-        line = "LevelMgr@ EnterLevel Map_Desert_T16_001"
+    def test_matches_open_main_world(self):
+        line = "SceneLevelMgr@ OpenMainWorld END! InMainLevelPath = /Game/Art/Maps/01SD/XZ_YuJinZhiXiBiNanSuo200/XZ_YuJinZhiXiBiNanSuo200"
         match = LEVEL_EVENT_PATTERN.search(line)
         assert match is not None
-        assert match.group("event_type") == "EnterLevel"
-        assert match.group("level_info") == "Map_Desert_T16_001"
+        assert match.group("event_type") == "OpenMainWorld"
+        assert "/Game/Art/Maps/01SD/XZ_YuJinZhiXiBiNanSuo200" in match.group("level_info")
 
-    def test_matches_open_level(self):
-        line = "LevelMgr@ OpenLevel Map_Forest_T14_002"
+    def test_matches_map_zone(self):
+        line = "SceneLevelMgr@ OpenMainWorld END! InMainLevelPath = /Game/Art/Maps/02KD/KD_YuanSuKuangDong000/KD_YuanSuKuangDong000"
         match = LEVEL_EVENT_PATTERN.search(line)
         assert match is not None
-        assert match.group("event_type") == "OpenLevel"
-        assert match.group("level_info") == "Map_Forest_T14_002"
+        assert match.group("event_type") == "OpenMainWorld"
+        assert "KD_YuanSuKuangDong000" in match.group("level_info")
 
-    def test_matches_with_spaces_in_level_info(self):
-        line = "LevelMgr@ EnterLevel Some Level With Spaces"
+    def test_no_match_on_other_scene_events(self):
+        line = "SceneLevelMgr@ OpenSubWorld STT!"
         match = LEVEL_EVENT_PATTERN.search(line)
-        assert match is not None
-        assert match.group("level_info") == "Some Level With Spaces"
+        assert match is None
 
 
 class TestHubZonePatterns:
@@ -108,5 +107,16 @@ class TestHubZonePatterns:
     def test_detects_hideout(self):
         assert any(p.search("Player_Hideout_01") for p in HUB_ZONE_PATTERNS)
 
+    def test_detects_embers_rest_by_path(self):
+        # Ember's Rest hideout path
+        assert any(p.search("/Game/Art/Maps/01SD/XZ_YuJinZhiXiBiNanSuo200") for p in HUB_ZONE_PATTERNS)
+
+    def test_detects_embers_rest_by_name(self):
+        assert any(p.search("YuJinZhiXiBiNanSuo") for p in HUB_ZONE_PATTERNS)
+
     def test_does_not_match_map(self):
         assert not any(p.search("Map_Desert_T16_001") for p in HUB_ZONE_PATTERNS)
+
+    def test_does_not_match_map_zone_path(self):
+        # Map zones like 02KD should not be detected as hub
+        assert not any(p.search("/Game/Art/Maps/02KD/KD_YuanSuKuangDong000") for p in HUB_ZONE_PATTERNS)

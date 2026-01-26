@@ -13,6 +13,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Phase 4: Net worth and profit/hour calculations
 - Phase 5: PyInstaller portable EXE packaging
 
+## [0.1.1] - 2026-01-26
+
+### Fixed
+- Level transition pattern updated to match actual game log format
+  - Changed from `LevelMgr@ EnterLevel` to `SceneLevelMgr@ OpenMainWorld END!`
+- Hub zone detection patterns expanded to include:
+  - `/01SD/` (Ember's Rest hideout path)
+  - `YuJinZhiXiBiNanSuo` (Ember's Rest Chinese name)
+
+### Added
+- Zone name mapping system (`data/zones.py`)
+  - Maps internal Chinese pinyin zone names to English display names
+  - `get_zone_display_name()` function for lookups
+  - Extensible dictionary for user-added mappings
+- CLI now displays English zone names in `show-runs` and `tail` output
+
+### Verified
+- Real-world testing with live game data
+- Successfully tracked multiple map runs with accurate FE and loot tallies
+- Run duration timing working correctly
+
 ## [0.1.0] - 2026-01-26
 
 ### Added

@@ -14,9 +14,9 @@ from titrack.parser.patterns import FE_CONFIG_BASE_ID
 
 
 SAMPLE_LOG = """\
-[2026.01.26-10.00.00:000][  0]LogLevel: LevelMgr@ EnterLevel MainHub_Social
+[2026.01.26-10.00.00:000][  0]GameLog: Display: [Game] SceneLevelMgr@ OpenMainWorld END! InMainLevelPath = /Game/Art/Maps/01SD/XZ_YuJinZhiXiBiNanSuo200/XZ_YuJinZhiXiBiNanSuo200
 [2026.01.26-10.00.05:000][  0]GameLog: Display: [Game] BagMgr@:Modfy BagItem PageId = 102 SlotId = 0 ConfigBaseId = 100300 Num = 500
-[2026.01.26-10.01.00:000][  0]LogLevel: LevelMgr@ EnterLevel Map_Desert_T16_001
+[2026.01.26-10.01.00:000][  0]GameLog: Display: [Game] SceneLevelMgr@ OpenMainWorld END! InMainLevelPath = /Game/Art/Maps/02KD/KD_YuanSuKuangDong000/KD_YuanSuKuangDong000
 [2026.01.26-10.01.30:000][  0]GameLog: Display: [Game] ItemChange@ ProtoName=PickItems start
 [2026.01.26-10.01.30:001][  0]GameLog: Display: [Game] BagMgr@:Modfy BagItem PageId = 102 SlotId = 0 ConfigBaseId = 100300 Num = 550
 [2026.01.26-10.01.30:002][  0]GameLog: Display: [Game] ItemChange@ ProtoName=PickItems end
@@ -27,7 +27,7 @@ SAMPLE_LOG = """\
 [2026.01.26-10.03.00:000][  0]GameLog: Display: [Game] ItemChange@ ProtoName=PickItems start
 [2026.01.26-10.03.00:001][  0]GameLog: Display: [Game] BagMgr@:Modfy BagItem PageId = 102 SlotId = 0 ConfigBaseId = 100300 Num = 700
 [2026.01.26-10.03.00:002][  0]GameLog: Display: [Game] ItemChange@ ProtoName=PickItems end
-[2026.01.26-10.05.00:000][  0]LogLevel: LevelMgr@ EnterLevel MainHub_Social
+[2026.01.26-10.05.00:000][  0]GameLog: Display: [Game] SceneLevelMgr@ OpenMainWorld END! InMainLevelPath = /Game/Art/Maps/01SD/XZ_YuJinZhiXiBiNanSuo200/XZ_YuJinZhiXiBiNanSuo200
 """
 
 

@@ -10,7 +10,7 @@ Inspired by [WealthyExile](https://github.com/WealthyExile) for Path of Exile.
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| Log Parser | ✓ Complete | Regex-based parsing of BagMgr, ItemChange, LevelMgr events |
+| Log Parser | ✓ Complete | Regex-based parsing of BagMgr, ItemChange, SceneLevelMgr events |
 | Delta Calculator | ✓ Complete | Computes inventory changes from absolute stack counts |
 | Run Segmenter | ✓ Complete | Detects map vs hub zones, tracks run boundaries |
 | Database Layer | ✓ Complete | SQLite with WAL mode, full CRUD repository |
@@ -28,6 +28,9 @@ Inspired by [WealthyExile](https://github.com/WealthyExile) for Path of Exile.
 - Persist all data to local SQLite database
 - Resume tracking from last position after restart
 - Display inventory state and run history via CLI
+- Zone name mapping (internal Chinese names → English display names)
+
+**Tested with live game data** - successfully tracked multiple map runs with accurate FE and loot tallies.
 
 ### What's Planned (Future Phases)
 
@@ -211,7 +214,7 @@ Game Log File
 - **ConfigBaseId**: Integer item type identifier from game logs
 - **Delta**: Change in quantity (current - previous) for a slot
 - **SlotState**: Current `(ConfigBaseId, Num)` for each `(PageId, SlotId)`
-- **Run**: Time period in a single zone, bounded by EnterLevel events
+- **Run**: Time period in a single zone, bounded by OpenMainWorld events
 - **Context**: Whether an item change occurred during PickItems (loot) or other actions
 
 ### Database Schema
@@ -280,9 +283,20 @@ GameLog: Display: [Game] ItemChange@ ProtoName=PickItems start
 GameLog: Display: [Game] BagMgr@:Modfy BagItem PageId = 102 SlotId = 0 ConfigBaseId = 100300 Num = 671
 GameLog: Display: [Game] ItemChange@ ProtoName=PickItems end
 
-# Level transitions
-LevelMgr@ EnterLevel Map_Desert_T16_001
-LevelMgr@ OpenLevel Map_Forest_T14_002
+# Level transitions (actual game format)
+SceneLevelMgr@ OpenMainWorld END! InMainLevelPath = /Game/Art/Maps/01SD/XZ_YuJinZhiXiBiNanSuo200/...
+```
+
+## Zone Name Mapping
+
+Internal map paths use Chinese pinyin names. Edit `src/titrack/data/zones.py` to add English mappings:
+
+```python
+ZONE_NAMES = {
+    "XZ_YuJinZhiXiBiNanSuo": "Hideout - Ember's Rest",
+    "KD_YuanSuKuangDong": "Elemental Cave",
+    # Add more as you discover them
+}
 ```
 
 ## License

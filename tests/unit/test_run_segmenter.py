@@ -26,6 +26,14 @@ class TestIsHubZone:
     def test_case_insensitive(self):
         assert is_hub_zone("MAINHUB_social") is True
 
+    def test_detects_embers_rest(self):
+        # Real game path for Ember's Rest hideout
+        assert is_hub_zone("/Game/Art/Maps/01SD/XZ_YuJinZhiXiBiNanSuo200") is True
+
+    def test_map_zone_not_hub(self):
+        # Real game path for a map zone
+        assert is_hub_zone("/Game/Art/Maps/02KD/KD_YuanSuKuangDong000") is False
+
 
 @pytest.fixture
 def segmenter():
@@ -38,7 +46,7 @@ class TestRunSegmenter:
 
     def test_enter_map_starts_run(self, segmenter):
         event = ParsedLevelEvent(
-            event_type="EnterLevel",
+            event_type="OpenMainWorld",
             level_info="Map_Desert_T16_001",
             raw_line="test",
         )
@@ -52,7 +60,7 @@ class TestRunSegmenter:
 
     def test_enter_hub_creates_hub_run(self, segmenter):
         event = ParsedLevelEvent(
-            event_type="EnterLevel",
+            event_type="OpenMainWorld",
             level_info="MainHub_Social",
             raw_line="test",
         )
@@ -66,14 +74,14 @@ class TestRunSegmenter:
         ts2 = datetime(2026, 1, 26, 10, 5, 0)
 
         event1 = ParsedLevelEvent(
-            event_type="EnterLevel",
+            event_type="OpenMainWorld",
             level_info="Map_Desert_T16_001",
             raw_line="test",
         )
         segmenter.process_event(event1, timestamp=ts1)
 
         event2 = ParsedLevelEvent(
-            event_type="EnterLevel",
+            event_type="OpenMainWorld",
             level_info="MainHub_Social",
             raw_line="test",
         )
@@ -84,9 +92,10 @@ class TestRunSegmenter:
         assert ended.end_ts == ts2
         assert ended.duration_seconds == 300  # 5 minutes
 
-    def test_open_level_does_not_trigger_run(self, segmenter):
+    def test_other_event_types_do_not_trigger_run(self, segmenter):
+        # Only OpenMainWorld should trigger runs
         event = ParsedLevelEvent(
-            event_type="OpenLevel",
+            event_type="SomeOtherEvent",
             level_info="Map_Desert_T16_001",
             raw_line="test",
         )
@@ -97,14 +106,14 @@ class TestRunSegmenter:
 
     def test_run_ids_increment(self, segmenter):
         event1 = ParsedLevelEvent(
-            event_type="EnterLevel",
+            event_type="OpenMainWorld",
             level_info="Map_1",
             raw_line="test",
         )
         _, run1 = segmenter.process_event(event1)
 
         event2 = ParsedLevelEvent(
-            event_type="EnterLevel",
+            event_type="OpenMainWorld",
             level_info="Map_2",
             raw_line="test",
         )
@@ -115,7 +124,7 @@ class TestRunSegmenter:
 
     def test_force_end_current_run(self, segmenter):
         event = ParsedLevelEvent(
-            event_type="EnterLevel",
+            event_type="OpenMainWorld",
             level_info="Map_Desert_T16_001",
             raw_line="test",
         )
@@ -134,7 +143,7 @@ class TestRunSegmenter:
         segmenter.set_next_run_id(100)
 
         event = ParsedLevelEvent(
-            event_type="EnterLevel",
+            event_type="OpenMainWorld",
             level_info="Map_1",
             raw_line="test",
         )

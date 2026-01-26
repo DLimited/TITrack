@@ -38,11 +38,11 @@ class TestParseLine:
         assert event.is_start is False
 
     def test_parses_level_event(self):
-        line = "LevelMgr@ EnterLevel Map_Desert_T16_001"
+        line = "SceneLevelMgr@ OpenMainWorld END! InMainLevelPath = /Game/Art/Maps/02KD/KD_YuanSuKuangDong000"
         event = parse_line(line)
         assert isinstance(event, ParsedLevelEvent)
-        assert event.event_type == "EnterLevel"
-        assert event.level_info == "Map_Desert_T16_001"
+        assert event.event_type == "OpenMainWorld"
+        assert "KD_YuanSuKuangDong000" in event.level_info
 
     def test_returns_none_for_unknown_line(self):
         line = "Some random log line"
@@ -54,10 +54,10 @@ class TestParseLine:
         assert event is None
 
     def test_handles_newlines(self):
-        line = "LevelMgr@ EnterLevel Map_Desert_T16_001\r\n"
+        line = "SceneLevelMgr@ OpenMainWorld END! InMainLevelPath = /Game/Art/Maps/01SD/XZ_Test\r\n"
         event = parse_line(line)
         assert isinstance(event, ParsedLevelEvent)
-        assert event.level_info == "Map_Desert_T16_001"
+        assert "XZ_Test" in event.level_info
 
 
 class TestParseLines:
