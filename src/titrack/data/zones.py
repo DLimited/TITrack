@@ -90,16 +90,22 @@ ZONE_NAMES = {
 LEVEL_ID_ZONES = {
     # Grimwind Woods - same path (YL_BeiFengLinDi201) in different areas
     4606: "Glacial Abyss - Grimwind Woods",
+    5006: "Glacial Abyss - Grimwind Woods",
     4654: "Voidlands - Grimwind Woods",
+    5054: "Voidlands - Grimwind Woods",
     # Elemental Mine - same path (KD_YuanSuKuangDong000) in different areas
     4612: "Blistering Lava Sea - Elemental Mine",
     4655: "Voidlands - Elemental Mine",
+    # GeBuLinCunLuo - same path in different areas
+    5002: "Glacial Abyss - Demiman Village",
     # Boss zones (Timemark bosses)
     3016: "Blistering Lava Sea - Hellfire Chasm",
     3006: "Glacial Abyss - Throne of Winter",
     3036: "Thunder Wastes - Summit of Thunder",
     3026: "Steel Forge - Imaginary Monument",
     3046: "Voidlands - Dreamless Abyss",
+    # Secret Realm
+    234020: "Secret Realm - Sea of Rites",
 }
 
 
