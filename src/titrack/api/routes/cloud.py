@@ -224,6 +224,49 @@ def get_cloud_prices(
     )
 
 
+@router.get("/debug")
+def get_cloud_debug(
+    request: Request,
+    repo: Repository = Depends(get_repository),
+) -> dict:
+    """Debug endpoint to diagnose cloud sync issues."""
+    sync_manager = get_sync_manager(request)
+
+    result = {
+        "repo_season_id": repo._current_season_id,
+        "repo_player_id": repo._current_player_id,
+    }
+
+    if sync_manager:
+        result["sync_manager_season_id"] = sync_manager._season_id
+        result["cloud_last_price_sync"] = repo.get_setting("cloud_last_price_sync")
+
+        # Try to fetch directly from cloud to compare
+        if sync_manager.client.is_connected and sync_manager._season_id:
+            # Fetch without 'since' filter to see all available data
+            try:
+                all_prices = sync_manager.client.fetch_prices_delta(
+                    sync_manager._season_id, since=None
+                )
+                result["cloud_prices_available"] = len(all_prices)
+                if all_prices:
+                    result["cloud_prices_sample"] = [
+                        {"id": p.config_base_id, "updated_at": p.updated_at.isoformat() if p.updated_at else None}
+                        for p in all_prices[:5]
+                    ]
+            except Exception as e:
+                result["cloud_fetch_error"] = str(e)
+
+        # Check local cache
+        cache_count = repo.db.fetchone(
+            "SELECT COUNT(*) FROM cloud_price_cache WHERE season_id = ?",
+            (sync_manager._season_id or 0,)
+        )
+        result["local_cache_count"] = cache_count[0] if cache_count else 0
+
+    return result
+
+
 @router.get("/prices/{config_base_id}/history", response_model=CloudPriceHistoryResponse)
 def get_cloud_price_history(
     config_base_id: int,
