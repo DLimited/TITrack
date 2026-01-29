@@ -39,6 +39,8 @@ class Database:
         self._connection.execute("PRAGMA journal_mode=WAL")
         self._connection.execute("PRAGMA synchronous=NORMAL")
         self._connection.execute("PRAGMA foreign_keys=ON")
+        # Wait up to 5 seconds for locks instead of failing immediately
+        self._connection.execute("PRAGMA busy_timeout=5000")
 
         # Initialize schema
         self._init_schema()
