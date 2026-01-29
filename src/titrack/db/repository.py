@@ -503,6 +503,95 @@ class Repository:
             return None
         return self._row_to_price(row)
 
+    def get_cloud_price(self, config_base_id: int, season_id: Optional[int] = None) -> Optional[float]:
+        """
+        Get cloud price for an item (median price from community data).
+
+        Returns the median price in FE, or None if not available.
+        Only returns prices with at least 3 unique contributors.
+        """
+        season_id = season_id if season_id is not None else self._current_season_id
+        season_id_filter = season_id if season_id is not None else 0
+
+        row = self.db.fetchone(
+            """SELECT price_fe_median, unique_devices FROM cloud_price_cache
+               WHERE config_base_id = ? AND season_id = ? AND unique_devices >= 1""",
+            (config_base_id, season_id_filter),
+        )
+        if not row:
+            return None
+        return row["price_fe_median"]
+
+    def get_effective_price(self, config_base_id: int, season_id: Optional[int] = None) -> Optional[float]:
+        """
+        Get the effective price for an item using cloud-first logic.
+
+        Priority:
+        1. Cloud price is the default (community aggregate, more reliable)
+        2. Local price overrides ONLY if it's newer than the cloud data
+
+        Returns the price in FE, or None if no price available.
+        """
+        from datetime import datetime
+
+        season_id = season_id if season_id is not None else self._current_season_id
+        season_id_filter = season_id if season_id is not None else 0
+
+        # Get cloud price with timestamp
+        cloud_row = self.db.fetchone(
+            """SELECT price_fe_median, cloud_updated_at, unique_devices FROM cloud_price_cache
+               WHERE config_base_id = ? AND season_id = ? AND unique_devices >= 1""",
+            (config_base_id, season_id_filter),
+        )
+
+        # Get local price with timestamp
+        local_row = self.db.fetchone(
+            "SELECT price_fe, updated_at FROM prices WHERE config_base_id = ? AND season_id = ?",
+            (config_base_id, season_id_filter),
+        )
+
+        cloud_price = cloud_row["price_fe_median"] if cloud_row else None
+        local_price = local_row["price_fe"] if local_row else None
+
+        # If only one exists, use it
+        if cloud_price is None and local_price is None:
+            return None
+        if cloud_price is None:
+            return local_price
+        if local_price is None:
+            return cloud_price
+
+        # Both exist - compare timestamps
+        # Local overrides only if it's newer than cloud
+        cloud_updated = cloud_row["cloud_updated_at"] if cloud_row else None
+        local_updated = local_row["updated_at"] if local_row else None
+
+        if cloud_updated and local_updated:
+            try:
+                # Parse ISO format timestamps and normalize to naive UTC for comparison
+                cloud_dt = datetime.fromisoformat(cloud_updated.replace("Z", "+00:00"))
+                local_dt = datetime.fromisoformat(local_updated.replace("Z", "+00:00"))
+
+                # Strip timezone info for comparison (both treated as UTC)
+                if cloud_dt.tzinfo is not None:
+                    cloud_dt = cloud_dt.replace(tzinfo=None)
+                if local_dt.tzinfo is not None:
+                    local_dt = local_dt.replace(tzinfo=None)
+
+                if local_dt > cloud_dt:
+                    return local_price
+                else:
+                    return cloud_price
+            except (ValueError, AttributeError, TypeError):
+                # If timestamp parsing fails, prefer cloud
+                return cloud_price
+        elif local_updated and not cloud_updated:
+            # Cloud has no timestamp, prefer local if it has one
+            return local_price
+        else:
+            # Default to cloud
+            return cloud_price
+
     def get_all_prices(self, season_id: Optional[int] = None) -> list[Price]:
         """Get all prices, filtered by season (no cross-season mixing)."""
         # Use provided value or fall back to context
@@ -602,9 +691,12 @@ class Repository:
                 continue
             if quantity <= 0:
                 continue
-            price = self.get_price(config_id)
-            if price and price.price_fe > 0:
-                total_value += price.price_fe * quantity
+
+            # Use effective price (cloud-first, local overrides if newer)
+            price_fe = self.get_effective_price(config_id)
+
+            if price_fe and price_fe > 0:
+                total_value += price_fe * quantity
 
         return raw_fe, total_value
 

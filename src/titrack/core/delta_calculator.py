@@ -68,6 +68,20 @@ class DeltaCalculator:
             Tuple of (delta or None if no change, new slot state)
         """
         timestamp = timestamp or datetime.now()
+
+        # Validate non-negative quantity
+        if event.num < 0:
+            print(f"WARNING: Negative quantity {event.num} for item {event.config_base_id}, treating as 0")
+            # Create a modified event with num=0 to avoid data corruption
+            from titrack.core.models import ParsedBagEvent as BagEvent
+            event = BagEvent(
+                page_id=event.page_id,
+                slot_id=event.slot_id,
+                config_base_id=event.config_base_id,
+                num=0,
+                is_init=event.is_init,
+            )
+
         key = SlotKey(event.page_id, event.slot_id)
         old_state = self._slot_states.get(key)
 

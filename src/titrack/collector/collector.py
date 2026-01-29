@@ -93,6 +93,7 @@ class Collector:
         self._pending_player_data: dict[str, any] = {}
         self._player_data_last_update: Optional[datetime] = None
         self._player_data_batch_threshold_seconds = 2.0  # New player data if > 2 seconds gap
+        self._player_data_max_age_seconds = 30.0  # Discard incomplete batches older than this
 
         # Context tracking
         self._current_context = EventContext.OTHER
@@ -103,8 +104,9 @@ class Collector:
         self._pending_level_type: Optional[int] = None
         self._pending_level_uid: Optional[int] = None
 
-        # Exchange price tracking: SynId -> ConfigBaseId
-        self._pending_price_searches: dict[int, int] = {}
+        # Exchange price tracking: SynId -> (ConfigBaseId, timestamp)
+        self._pending_price_searches: dict[int, tuple[int, datetime]] = {}
+        self._pending_price_search_ttl_seconds = 300  # 5 minute TTL for pending searches
 
         # InitBagData batch tracking: page_id -> last init timestamp
         # Used to detect new init batches and clear stale slot states
@@ -150,6 +152,10 @@ class Collector:
             file_path, position, file_size = position_data
             if file_path == self.tailer.file_path:
                 self.tailer.set_position(position, file_size)
+        else:
+            # First run - seek to end of log file to only process new events
+            # This prevents reading old player login events from previous game sessions
+            self.tailer.seek_to_end()
 
     def _process_player_change(self, new_player_info: PlayerInfo) -> bool:
         """
@@ -391,6 +397,16 @@ class Collector:
         self, event: ParsedPlayerDataEvent, timestamp: datetime
     ) -> None:
         """Handle player data from streaming log (for character change detection)."""
+        # Check if pending data is too old (incomplete batch timeout)
+        if (
+            self._player_data_last_update is not None
+            and self._pending_player_data
+            and (timestamp - self._player_data_last_update).total_seconds()
+            > self._player_data_max_age_seconds
+        ):
+            # Discard stale incomplete batch
+            self._pending_player_data = {}
+
         # Check if this is a new batch of player data (time gap > threshold)
         is_new_batch = (
             self._player_data_last_update is None
@@ -432,21 +448,36 @@ class Collector:
                 # Clear pending data after successful change
                 self._pending_player_data = {}
 
+    def _cleanup_stale_pending_searches(self, current_time: datetime) -> None:
+        """Remove pending price searches older than TTL."""
+        stale_keys = [
+            syn_id
+            for syn_id, (_, created_at) in self._pending_price_searches.items()
+            if (current_time - created_at).total_seconds() > self._pending_price_search_ttl_seconds
+        ]
+        for key in stale_keys:
+            del self._pending_price_searches[key]
+
     def _handle_exchange_event(
         self,
         event: ExchangePriceRequest | ExchangePriceResponse,
         timestamp: datetime,
     ) -> None:
         """Handle exchange price search events."""
+        # Periodically clean up stale pending searches
+        if len(self._pending_price_searches) > 50:
+            self._cleanup_stale_pending_searches(timestamp)
+
         if isinstance(event, ExchangePriceRequest):
-            # Store pending search for correlation
-            self._pending_price_searches[event.syn_id] = event.config_base_id
+            # Store pending search for correlation with timestamp
+            self._pending_price_searches[event.syn_id] = (event.config_base_id, timestamp)
 
         elif isinstance(event, ExchangePriceResponse):
             # Find the corresponding request
-            config_base_id = self._pending_price_searches.pop(event.syn_id, None)
-            if config_base_id is None:
+            search_data = self._pending_price_searches.pop(event.syn_id, None)
+            if search_data is None:
                 return  # No matching request found
+            config_base_id, _ = search_data
 
             if not event.prices_fe:
                 return  # No prices to process

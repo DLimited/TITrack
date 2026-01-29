@@ -369,9 +369,11 @@ def cmd_serve(args: argparse.Namespace) -> int:
         # Connect to DB to check for saved setting
         temp_db = Database(settings.db_path)
         temp_db.connect()
-        temp_repo = Repository(temp_db)
-        saved_log_dir = temp_repo.get_setting("log_directory")
-        temp_db.close()
+        try:
+            temp_repo = Repository(temp_db)
+            saved_log_dir = temp_repo.get_setting("log_directory")
+        finally:
+            temp_db.close()
 
         if saved_log_dir:
             # Try using saved directory
@@ -386,130 +388,147 @@ def cmd_serve(args: argparse.Namespace) -> int:
     collector_db = None
     player_info = None
     sync_manager = None
+    api_db = None
 
-    # Start collector in background if log file is available
-    if settings.log_path and settings.log_path.exists():
-        print(f"Log file: {settings.log_path}")
+    try:
+        # Start collector in background if log file is available
+        if settings.log_path and settings.log_path.exists():
+            print(f"Log file: {settings.log_path}")
 
-        # Don't parse player info on startup - wait for live log detection
-        # This prevents showing stale data from a previously logged-in character
-        player_info = None
-        print("Waiting for character login...")
+            # Don't parse player info on startup - wait for live log detection
+            # This prevents showing stale data from a previously logged-in character
+            player_info = None
+            print("Waiting for character login...")
 
-        # Collector gets its own database connection
-        collector_db = Database(settings.db_path)
-        collector_db.connect()
+            # Collector gets its own database connection
+            collector_db = Database(settings.db_path)
+            collector_db.connect()
 
-        collector_repo = Repository(collector_db)
+            collector_repo = Repository(collector_db)
 
-        # Initialize sync manager (uses collector's DB connection)
-        # Don't set season context yet - wait for player detection from live log
-        sync_manager = SyncManager(collector_db)
-        sync_manager.initialize()
+            # Initialize sync manager (uses collector's DB connection)
+            # Don't set season context yet - wait for player detection from live log
+            sync_manager = SyncManager(collector_db)
+            sync_manager.initialize()
 
-        def on_price_update(price):
-            item_name = collector_repo.get_item_name(price.config_base_id)
-            print(f"  [Price] {item_name}: {price.price_fe:.6f} FE")
+            def on_price_update(price):
+                item_name = collector_repo.get_item_name(price.config_base_id)
+                print(f"  [Price] {item_name}: {price.price_fe:.6f} FE")
 
-        # Placeholder for player change callback (set after app is created)
-        player_change_callback = [None]  # Use list to allow closure modification
+            # Placeholder for player change callback (set after app is created)
+            player_change_callback = [None]  # Use list to allow closure modification
 
-        def on_player_change(new_player_info):
-            print(f"  [Player] Switched to: {new_player_info.name} ({new_player_info.season_name})")
-            # Update app state if callback is set
-            if player_change_callback[0]:
-                player_change_callback[0](new_player_info)
+            def on_player_change(new_player_info):
+                print(f"  [Player] Switched to: {new_player_info.name} ({new_player_info.season_name})")
+                # Update app state if callback is set
+                if player_change_callback[0]:
+                    player_change_callback[0](new_player_info)
 
-        collector = Collector(
-            db=collector_db,
+            collector = Collector(
+                db=collector_db,
+                log_path=settings.log_path,
+                on_delta=lambda d: None,  # Silent operation
+                on_run_start=lambda r: None,
+                on_run_end=lambda r: None,
+                on_price_update=on_price_update,
+                on_player_change=on_player_change,
+                player_info=player_info,
+                sync_manager=sync_manager,
+            )
+            collector.initialize()
+
+            def run_collector():
+                try:
+                    collector.tail(poll_interval=settings.poll_interval)
+                except Exception as e:
+                    print(f"Collector error: {e}")
+
+            collector_thread = threading.Thread(target=run_collector, daemon=True)
+            collector_thread.start()
+            print("Collector started in background")
+        else:
+            print("No log file found - collector not started")
+            if settings.log_path:
+                print(f"  Expected: {settings.log_path}")
+
+        # API gets its own database connection
+        api_db = Database(settings.db_path)
+        api_db.connect()
+
+        # Create FastAPI app
+        app = create_app(
+            db=api_db,
             log_path=settings.log_path,
-            on_delta=lambda d: None,  # Silent operation
-            on_run_start=lambda r: None,
-            on_run_end=lambda r: None,
-            on_price_update=on_price_update,
-            on_player_change=on_player_change,
+            collector_running=collector is not None,
+            collector=collector,
             player_info=player_info,
             sync_manager=sync_manager,
         )
-        collector.initialize()
 
-        def run_collector():
+        # Set up player change callback to update app state
+        if collector is not None:
+            def update_app_player(new_player_info):
+                app.state.player_info = new_player_info
+                # Also update the API repository context with effective player_id
+                if hasattr(app.state, 'repo'):
+                    effective_id = get_effective_player_id(new_player_info)
+                    app.state.repo.set_player_context(
+                        new_player_info.season_id,
+                        effective_id
+                    )
+                # Update sync manager season context
+                if hasattr(app.state, 'sync_manager') and app.state.sync_manager:
+                    app.state.sync_manager.set_season_context(new_player_info.season_id)
+            player_change_callback[0] = update_app_player
+
+        # Set up graceful shutdown
+        def signal_handler(sig, frame):
+            print("\nShutting down...")
+            if collector:
+                collector.stop()
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, signal_handler)
+
+        # Open browser unless disabled
+        url = f"http://127.0.0.1:{args.port}"
+        if not args.no_browser:
+            print(f"Opening browser at {url}")
+            webbrowser.open(url)
+
+        print(f"Starting server on port {args.port}")
+        print("Press Ctrl+C to stop\n")
+
+        # Run server
+        uvicorn.run(
+            app,
+            host=args.host,
+            port=args.port,
+            log_level="warning",
+        )
+    finally:
+        # Ensure proper cleanup of all resources
+        if sync_manager:
             try:
-                collector.tail(poll_interval=settings.poll_interval)
+                sync_manager.stop_background_sync()
             except Exception as e:
-                print(f"Collector error: {e}")
-
-        collector_thread = threading.Thread(target=run_collector, daemon=True)
-        collector_thread.start()
-        print("Collector started in background")
-    else:
-        print("No log file found - collector not started")
-        if settings.log_path:
-            print(f"  Expected: {settings.log_path}")
-
-    # API gets its own database connection
-    api_db = Database(settings.db_path)
-    api_db.connect()
-
-    # Create FastAPI app
-    app = create_app(
-        db=api_db,
-        log_path=settings.log_path,
-        collector_running=collector is not None,
-        collector=collector,
-        player_info=player_info,
-        sync_manager=sync_manager,
-    )
-
-    # Set up player change callback to update app state
-    if collector is not None:
-        def update_app_player(new_player_info):
-            app.state.player_info = new_player_info
-            # Also update the API repository context with effective player_id
-            if hasattr(app.state, 'repo'):
-                effective_id = get_effective_player_id(new_player_info)
-                app.state.repo.set_player_context(
-                    new_player_info.season_id,
-                    effective_id
-                )
-            # Update sync manager season context
-            if hasattr(app.state, 'sync_manager') and app.state.sync_manager:
-                app.state.sync_manager.set_season_context(new_player_info.season_id)
-        player_change_callback[0] = update_app_player
-
-    # Set up graceful shutdown
-    def signal_handler(sig, frame):
-        print("\nShutting down...")
+                print(f"Error stopping sync manager: {e}")
         if collector:
-            collector.stop()
-        sys.exit(0)
+            try:
+                collector.stop()
+            except Exception as e:
+                print(f"Error stopping collector: {e}")
+        if collector_db:
+            try:
+                collector_db.close()
+            except Exception as e:
+                print(f"Error closing collector DB: {e}")
+        if api_db:
+            try:
+                api_db.close()
+            except Exception as e:
+                print(f"Error closing API DB: {e}")
 
-    signal.signal(signal.SIGINT, signal_handler)
-
-    # Open browser unless disabled
-    url = f"http://127.0.0.1:{args.port}"
-    if not args.no_browser:
-        print(f"Opening browser at {url}")
-        webbrowser.open(url)
-
-    print(f"Starting server on port {args.port}")
-    print("Press Ctrl+C to stop\n")
-
-    # Run server
-    uvicorn.run(
-        app,
-        host=args.host,
-        port=args.port,
-        log_level="warning",
-    )
-
-    if sync_manager:
-        sync_manager.stop_background_sync()
-    if collector:
-        collector.stop()
-    if collector_db:
-        collector_db.close()
-    api_db.close()
     return 0
 
 
@@ -617,12 +636,27 @@ def create_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     """Main entry point."""
+    from titrack.config.paths import is_frozen
+    from titrack.version import __version__
+
     parser = create_parser()
     args = parser.parse_args()
 
+    # Default to serve mode when running as frozen exe with no command
     if args.command is None:
-        parser.print_help()
-        return 0
+        if is_frozen():
+            # Running as packaged EXE - default to serve with portable mode
+            print(f"TITrack v{__version__}")
+            print("Starting in portable mode...")
+            args.command = "serve"
+            args.file = None
+            args.port = 8000
+            args.host = "127.0.0.1"
+            args.no_browser = False
+            args.portable = True  # Force portable mode for frozen exe
+        else:
+            parser.print_help()
+            return 0
 
     commands = {
         "init": cmd_init,

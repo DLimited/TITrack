@@ -21,6 +21,10 @@ let priceHistoryChart = null;
 let cloudSyncEnabled = false;
 let cloudPricesCache = {};
 
+// Update state
+let updateStatus = null;
+let updateCheckInterval = null;
+
 // Inventory sorting state
 let inventorySortBy = 'value';
 let inventorySortOrder = 'desc';
@@ -1091,11 +1095,271 @@ function getIconHtml(configBaseId, cssClass) {
     return `<img src="${proxyUrl}" alt="" class="${cssClass}" data-config-id="${configBaseId}" onerror="handleIconError(this)">`;
 }
 
+// --- Update System ---
+
+async function fetchUpdateStatus() {
+    return fetchJson('/update/status');
+}
+
+async function triggerUpdateCheck() {
+    try {
+        const response = await fetch(`${API_BASE}/update/check`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error checking for updates:', error);
+        return null;
+    }
+}
+
+async function triggerUpdateDownload() {
+    try {
+        const response = await fetch(`${API_BASE}/update/download`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error downloading update:', error);
+        return null;
+    }
+}
+
+async function triggerUpdateInstall() {
+    try {
+        const response = await fetch(`${API_BASE}/update/install`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error installing update:', error);
+        return null;
+    }
+}
+
+function renderVersion(status) {
+    const versionEl = document.getElementById('app-version');
+    const badgeEl = document.getElementById('update-badge');
+    const checkBtn = document.getElementById('check-updates-btn');
+
+    if (!status) {
+        versionEl.textContent = 'v--';
+        return;
+    }
+
+    versionEl.textContent = `v${status.current_version}`;
+
+    // Show/hide update badge
+    if (status.status === 'available' || status.status === 'ready') {
+        badgeEl.classList.remove('hidden');
+        badgeEl.title = `Update available: v${status.latest_version}`;
+    } else {
+        badgeEl.classList.add('hidden');
+    }
+
+    // Update button state
+    if (!status.can_update) {
+        checkBtn.style.display = 'none'; // Hide in dev mode
+    } else {
+        checkBtn.style.display = '';
+        if (status.status === 'checking') {
+            checkBtn.textContent = 'Checking...';
+            checkBtn.disabled = true;
+        } else if (status.status === 'available') {
+            checkBtn.textContent = 'Update Available!';
+            checkBtn.disabled = false;
+            checkBtn.classList.add('update-available');
+        } else if (status.status === 'downloading') {
+            checkBtn.textContent = 'Downloading...';
+            checkBtn.disabled = true;
+        } else if (status.status === 'ready') {
+            checkBtn.textContent = 'Install Update';
+            checkBtn.disabled = false;
+            checkBtn.classList.add('update-ready');
+        } else {
+            checkBtn.textContent = 'Check for Updates';
+            checkBtn.disabled = false;
+            checkBtn.classList.remove('update-available', 'update-ready');
+        }
+    }
+}
+
+async function checkForUpdates() {
+    const status = await fetchUpdateStatus();
+
+    if (status && (status.status === 'available' || status.status === 'ready')) {
+        showUpdateModal(status);
+        return;
+    }
+
+    // Trigger update check
+    await triggerUpdateCheck();
+
+    // Start polling for result
+    startUpdateStatusPolling();
+}
+
+function startUpdateStatusPolling() {
+    if (updateCheckInterval) return;
+
+    updateCheckInterval = setInterval(async () => {
+        const status = await fetchUpdateStatus();
+        updateStatus = status;
+        renderVersion(status);
+
+        // Stop polling when done checking
+        if (status && status.status !== 'checking' && status.status !== 'downloading') {
+            stopUpdateStatusPolling();
+
+            if (status.status === 'available') {
+                showUpdateModal(status);
+            } else if (status.status === 'error') {
+                alert('Update check failed: ' + (status.error_message || 'Unknown error'));
+            }
+        }
+    }, 1000);
+}
+
+function stopUpdateStatusPolling() {
+    if (updateCheckInterval) {
+        clearInterval(updateCheckInterval);
+        updateCheckInterval = null;
+    }
+}
+
+function showUpdateModal(status) {
+    const modal = document.getElementById('update-modal');
+    const currentVersionEl = document.getElementById('update-current-version');
+    const newVersionEl = document.getElementById('update-new-version');
+    const releaseNotesEl = document.getElementById('update-release-notes');
+    const progressContainer = document.getElementById('update-progress-container');
+    const actionsEl = document.getElementById('update-actions');
+
+    currentVersionEl.textContent = `v${status.current_version}`;
+    newVersionEl.textContent = `v${status.latest_version}`;
+
+    // Show release notes (simple markdown to HTML)
+    if (status.release_notes) {
+        releaseNotesEl.innerHTML = simpleMarkdown(status.release_notes);
+    } else {
+        releaseNotesEl.textContent = 'No release notes available.';
+    }
+
+    // Reset progress
+    progressContainer.classList.add('hidden');
+    actionsEl.classList.remove('hidden');
+
+    modal.classList.remove('hidden');
+}
+
+function closeUpdateModal() {
+    document.getElementById('update-modal').classList.add('hidden');
+    stopUpdateStatusPolling();
+}
+
+async function downloadAndInstallUpdate() {
+    const downloadBtn = document.getElementById('update-download-btn');
+    const progressContainer = document.getElementById('update-progress-container');
+    const progressBar = document.getElementById('update-progress-bar');
+    const progressText = document.getElementById('update-progress-text');
+
+    // Start download
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = 'Downloading...';
+
+    const result = await triggerUpdateDownload();
+    if (!result || !result.success) {
+        alert('Failed to start download: ' + (result?.message || 'Unknown error'));
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = 'Download & Install';
+        return;
+    }
+
+    // Show progress
+    progressContainer.classList.remove('hidden');
+
+    // Poll for download progress
+    const progressInterval = setInterval(async () => {
+        const status = await fetchUpdateStatus();
+        updateStatus = status;
+
+        if (status) {
+            if (status.download_size > 0) {
+                const percent = Math.round((status.download_progress / status.download_size) * 100);
+                progressBar.style.width = `${percent}%`;
+                const mb = (status.download_progress / 1024 / 1024).toFixed(1);
+                const totalMb = (status.download_size / 1024 / 1024).toFixed(1);
+                progressText.textContent = `Downloading... ${mb} / ${totalMb} MB`;
+            }
+
+            if (status.status === 'ready') {
+                clearInterval(progressInterval);
+                progressText.textContent = 'Download complete. Installing...';
+                progressBar.style.width = '100%';
+
+                // Confirm and install
+                if (confirm('Update downloaded. TITrack will restart to apply the update.\n\nContinue?')) {
+                    await triggerUpdateInstall();
+                    // If we get here, install failed
+                    alert('Failed to start installation. Please try again.');
+                } else {
+                    downloadBtn.disabled = false;
+                    downloadBtn.textContent = 'Install Update';
+                    progressText.textContent = 'Ready to install';
+                }
+            } else if (status.status === 'error') {
+                clearInterval(progressInterval);
+                progressText.textContent = 'Download failed: ' + (status.error_message || 'Unknown error');
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = 'Retry';
+            }
+        }
+    }, 500);
+}
+
+function simpleMarkdown(text) {
+    // Very basic markdown to HTML conversion
+    return text
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/`(.+?)`/g, '<code>$1</code>')
+        .replace(/^### (.+)$/gm, '<h5>$1</h5>')
+        .replace(/^## (.+)$/gm, '<h4>$1</h4>')
+        .replace(/^# (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+        .replace(/\n\n/g, '<br><br>')
+        .replace(/\n/g, '<br>');
+}
+
+// Close update modal on outside click and escape
+document.addEventListener('click', (e) => {
+    if (e.target.id === 'update-modal') {
+        closeUpdateModal();
+    }
+});
+
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Set initial sort indicators
     updateSortIndicators();
+
+    // Fetch and display version info
+    const versionStatus = await fetchUpdateStatus();
+    updateStatus = versionStatus;
+    renderVersion(versionStatus);
 
     // Fetch player info initially
     const player = await fetchPlayer();

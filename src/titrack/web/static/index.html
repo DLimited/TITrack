@@ -115,6 +115,11 @@
         <footer>
             <span id="last-update">Last updated: --</span>
             <span id="collector-status">Collector: --</span>
+            <span class="footer-version">
+                <span id="app-version">v--</span>
+                <button id="check-updates-btn" class="update-btn" onclick="checkForUpdates()">Check for Updates</button>
+                <span id="update-badge" class="update-badge hidden" title="Update available"></span>
+            </span>
         </footer>
     </div>
 
@@ -304,6 +309,38 @@
                     </div>
                 </div>
                 <p class="price-history-note">Prices are aggregated from anonymous community submissions. Minimum 3 unique contributors required.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="update-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Update Available</h3>
+                <button class="close-btn" onclick="closeUpdateModal()">&times;</button>
+            </div>
+            <div class="update-body">
+                <div class="update-info">
+                    <p class="update-version">
+                        <span class="current-version" id="update-current-version">v--</span>
+                        <span class="version-arrow">→</span>
+                        <span class="new-version" id="update-new-version">v--</span>
+                    </p>
+                </div>
+                <div class="update-release-notes">
+                    <h4>Release Notes</h4>
+                    <div id="update-release-notes" class="release-notes-content">Loading...</div>
+                </div>
+                <div class="update-progress hidden" id="update-progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="update-progress-bar" style="width: 0%"></div>
+                    </div>
+                    <span class="progress-text" id="update-progress-text">Downloading...</span>
+                </div>
+                <div class="modal-actions" id="update-actions">
+                    <button onclick="downloadAndInstallUpdate()" class="save-btn" id="update-download-btn">Download & Install</button>
+                    <button onclick="closeUpdateModal()" class="cancel-btn">Later</button>
+                </div>
             </div>
         </div>
     </div>

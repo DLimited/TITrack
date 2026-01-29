@@ -7,11 +7,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from titrack.api.routes import cloud, icons, inventory, items, prices, runs, settings, stats
+from titrack.api.routes import cloud, icons, inventory, items, prices, runs, settings, stats, update
 from titrack.api.schemas import PlayerResponse, StatusResponse
+from titrack.config.paths import get_static_dir
 from titrack.db.connection import Database
 from titrack.db.repository import Repository
-from titrack.parser.player_parser import get_enter_log_path, get_effective_player_id, parse_enter_log, PlayerInfo
+from titrack.parser.player_parser import get_effective_player_id, PlayerInfo
+from titrack.version import __version__
 
 
 def create_app(
@@ -37,7 +39,7 @@ def create_app(
     app = FastAPI(
         title="TITrack API",
         description="Torchlight Infinite Local Loot Tracker API",
-        version="0.3.0",  # Bumped for multi-season support
+        version=__version__,
     )
 
     # CORS middleware for local development
@@ -78,6 +80,16 @@ def create_app(
     app.include_router(icons.router)
     app.include_router(settings.router)
     app.include_router(cloud.router)
+    app.include_router(update.router)
+
+    # Initialize update manager
+    try:
+        from titrack.updater.manager import UpdateManager
+        update_manager = UpdateManager()
+        app.state.update_manager = update_manager
+    except Exception as e:
+        print(f"Failed to initialize update manager: {e}")
+        app.state.update_manager = None
 
     # Store state for status endpoint and reset functionality
     app.state.db = db
@@ -105,41 +117,26 @@ def create_app(
     @app.get("/api/player", response_model=Optional[PlayerResponse], tags=["player"])
     def get_player() -> Optional[PlayerResponse]:
         """Get current player/character information."""
-        # Use cached player_info if available (from startup)
+        # Only return player info if detected from live log stream
+        # Do NOT fall back to parsing log file - that would show stale data
+        # from previous game sessions before user logs in
         pi = app.state.player_info
-        if pi:
-            return PlayerResponse(
-                name=pi.name,
-                level=pi.level,
-                season_id=pi.season_id,
-                season_name=pi.season_name,
-                hero_id=pi.hero_id,
-                hero_name=pi.hero_name,
-                player_id=pi.player_id,
-            )
-
-        # Fall back to parsing enter log
-        if not log_path:
-            return None
-
-        enter_log = get_enter_log_path(log_path)
-        parsed_info = parse_enter_log(enter_log)
-
-        if not parsed_info:
+        if not pi:
             return None
 
         return PlayerResponse(
-            name=parsed_info.name,
-            level=parsed_info.level,
-            season_id=parsed_info.season_id,
-            season_name=parsed_info.season_name,
-            hero_id=parsed_info.hero_id,
-            hero_name=parsed_info.hero_name,
-            player_id=parsed_info.player_id,
+            name=pi.name,
+            level=pi.level,
+            season_id=pi.season_id,
+            season_name=pi.season_name,
+            hero_id=pi.hero_id,
+            hero_name=pi.hero_name,
+            player_id=pi.player_id,
         )
 
     # Mount static files (must be last to not override API routes)
-    static_dir = Path(__file__).parent.parent / "web" / "static"
+    # Use paths module for proper frozen/source mode resolution
+    static_dir = get_static_dir()
     if static_dir.exists():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 

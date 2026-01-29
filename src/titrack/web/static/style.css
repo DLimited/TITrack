@@ -873,3 +873,169 @@ tr.nightmare .zone-name {
     border-radius: 3px;
     font-size: 0.85rem;
 }
+
+/* Version and Update Styles */
+.footer-version {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#app-version {
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+.update-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.update-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.update-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.update-btn.update-available {
+    border-color: var(--positive);
+    color: var(--positive);
+    animation: pulse 2s infinite;
+}
+
+.update-btn.update-ready {
+    background: var(--positive);
+    color: white;
+    border-color: var(--positive);
+}
+
+.update-badge {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--positive);
+    animation: pulse 2s infinite;
+}
+
+.update-badge.hidden {
+    display: none;
+}
+
+/* Update Modal */
+.update-body {
+    padding: 20px;
+}
+
+.update-info {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.update-version {
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
+
+.current-version {
+    color: var(--text-secondary);
+}
+
+.version-arrow {
+    color: var(--positive);
+    font-size: 1.5rem;
+}
+
+.new-version {
+    color: var(--positive);
+    font-weight: bold;
+}
+
+.update-release-notes {
+    margin-bottom: 20px;
+}
+
+.update-release-notes h4 {
+    color: var(--accent);
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.release-notes-content {
+    background: var(--bg-card);
+    padding: 15px;
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.release-notes-content h3,
+.release-notes-content h4,
+.release-notes-content h5 {
+    margin: 10px 0 5px;
+    color: var(--accent);
+}
+
+.release-notes-content ul {
+    margin-left: 20px;
+    padding: 0;
+}
+
+.release-notes-content li {
+    margin-bottom: 5px;
+}
+
+.release-notes-content code {
+    background: var(--bg-primary);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
+/* Progress bar */
+.update-progress {
+    margin-bottom: 20px;
+}
+
+.update-progress.hidden {
+    display: none;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-card);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--positive));
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-align: center;
+    display: block;
+}

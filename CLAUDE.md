@@ -267,14 +267,29 @@ TITrack supports opt-in cloud sync to share and receive community pricing data.
 - **Anonymous**: Uses device-based UUIDs, no user accounts required
 - **Opt-in**: Disabled by default, toggle in the UI header
 - **Offline-capable**: Works fully offline, syncs when connected
-- **Anti-poisoning**: Uses median aggregation with minimum 3 unique contributors
+- **Cloud-first pricing**: Cloud prices are used by default, local prices override only when newer
 
 ### How It Works
 
 1. When you search an item in the in-game Exchange, TITrack captures the prices
 2. If cloud sync is enabled, the price data is queued for upload
 3. Background threads upload your submissions and download community prices
-4. Community prices show as sparklines in the inventory table
+4. Community prices are used for inventory valuation and run value calculations
+
+### Pricing Priority
+
+The `get_effective_price()` method implements cloud-first pricing logic:
+
+1. **Cloud price is the default** - Community aggregate (median) is more reliable
+2. **Local price overrides only if newer** - Compares `local.updated_at` vs `cloud.cloud_updated_at`
+3. If only one source exists, that price is used
+4. If timestamp comparison fails, defaults to cloud price
+
+This means:
+- Fresh install with cloud sync enabled → uses cloud prices immediately
+- You search an item in Exchange → local price saved with current timestamp
+- If your local search is newer than cloud data → your price is used
+- When cloud data is updated → cloud price takes over again
 
 ### API Endpoints
 

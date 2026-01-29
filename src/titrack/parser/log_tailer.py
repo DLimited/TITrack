@@ -66,12 +66,33 @@ class LogTailer:
             self._position = position
             self._file_size = file_size
 
+    def seek_to_end(self) -> None:
+        """
+        Seek to end of log file.
+
+        Used on first run to skip existing log content and only
+        process new events going forward.
+        """
+        current_size = self._get_file_size()
+        if current_size is not None:
+            self._position = current_size
+            self._file_size = current_size
+
     def _get_file_size(self) -> Optional[int]:
         """Get current file size, or None if file doesn't exist."""
         try:
+            if not os.path.exists(self.file_path):
+                return None
             return os.path.getsize(self.file_path)
         except OSError:
             return None
+
+    def file_exists(self) -> bool:
+        """Check if the log file exists."""
+        try:
+            return os.path.exists(self.file_path) and os.path.isfile(self.file_path)
+        except OSError:
+            return False
 
     def read_new_lines(self) -> Generator[str, None, None]:
         """
@@ -83,6 +104,10 @@ class LogTailer:
         Yields:
             Complete log lines (without trailing newline)
         """
+        # Check if file exists before trying to read
+        if not self.file_exists():
+            return
+
         current_size = self._get_file_size()
         if current_size is None:
             return

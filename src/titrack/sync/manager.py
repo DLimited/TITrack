@@ -367,17 +367,32 @@ class SyncManager:
 
     def _upload_loop(self) -> None:
         """Background thread for uploading queued prices."""
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+        error_backoff_seconds = 30
+
         while self._running:
             try:
                 if self.is_enabled and self.is_upload_enabled:
                     if self.client.is_connected:
                         self._process_upload_queue()
+                        consecutive_errors = 0  # Reset on success
                     elif self.client.is_available:
                         # Try to reconnect
                         self.client.connect()
             except Exception as e:
+                consecutive_errors += 1
                 self._last_error = str(e)
-                print(f"Cloud sync upload error: {e}")
+                print(f"Cloud sync upload error ({consecutive_errors}): {e}")
+
+                # Back off if too many consecutive errors
+                if consecutive_errors >= max_consecutive_errors:
+                    print(f"Cloud sync: Too many upload errors, backing off {error_backoff_seconds}s")
+                    for _ in range(error_backoff_seconds):
+                        if not self._running:
+                            break
+                        time.sleep(1)
+                    consecutive_errors = 0  # Reset after backoff
 
             # Sleep in small increments to allow quick shutdown
             for _ in range(self.UPLOAD_INTERVAL):
@@ -387,18 +402,33 @@ class SyncManager:
 
     def _download_loop(self) -> None:
         """Background thread for downloading cloud prices."""
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+        error_backoff_seconds = 60
+
         while self._running:
             try:
                 if self.is_enabled and self.is_download_enabled:
                     if self.client.is_connected:
                         self._download_prices()
                         self._maybe_download_history()
+                        consecutive_errors = 0  # Reset on success
                     elif self.client.is_available:
                         # Try to reconnect
                         self.client.connect()
             except Exception as e:
+                consecutive_errors += 1
                 self._last_error = str(e)
-                print(f"Cloud sync download error: {e}")
+                print(f"Cloud sync download error ({consecutive_errors}): {e}")
+
+                # Back off if too many consecutive errors
+                if consecutive_errors >= max_consecutive_errors:
+                    print(f"Cloud sync: Too many download errors, backing off {error_backoff_seconds}s")
+                    for _ in range(error_backoff_seconds):
+                        if not self._running:
+                            break
+                        time.sleep(1)
+                    consecutive_errors = 0  # Reset after backoff
 
             # Sleep in small increments
             for _ in range(self.PRICE_DOWNLOAD_INTERVAL):
@@ -434,7 +464,17 @@ class SyncManager:
         uploaded = 0
         for row in rows:
             try:
-                prices_array = json.loads(row["prices_array"])
+                # Parse JSON with error handling for corrupted data
+                try:
+                    prices_array = json.loads(row["prices_array"])
+                except (json.JSONDecodeError, TypeError) as json_err:
+                    print(f"Cloud sync: Corrupted JSON in queue item {row['id']}: {json_err}")
+                    # Mark as failed and skip
+                    self.db.execute(
+                        "UPDATE cloud_sync_queue SET status = 'failed', attempts = ? WHERE id = ?",
+                        (self.MAX_RETRY_ATTEMPTS, row["id"]),
+                    )
+                    continue
 
                 result = self.client.submit_price(
                     device_id=self._device_id,

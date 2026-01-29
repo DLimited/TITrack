@@ -43,8 +43,10 @@ def _build_loot(summary: dict[int, int], repo: Repository) -> list[LootItem]:
     for config_id, quantity in summary.items():
         if quantity != 0:
             item = repo.get_item(config_id)
-            price = repo.get_price(config_id)
-            item_price_fe = price.price_fe if price else None
+
+            # Use effective price (cloud-first, local overrides if newer)
+            item_price_fe = repo.get_effective_price(config_id)
+
             # FE currency is worth 1:1
             if config_id == FE_CONFIG_BASE_ID:
                 item_price_fe = 1.0
@@ -191,6 +193,11 @@ def _consolidate_runs(all_runs_including_hubs: list[Run], repo: Repository) -> l
     return result
 
 
+# Validation limits
+MAX_PAGE_SIZE = 100
+MAX_PAGE = 10000
+
+
 @router.get("", response_model=RunListResponse)
 def list_runs(
     page: int = 1,
@@ -199,6 +206,16 @@ def list_runs(
     repo: Repository = Depends(get_repository),
 ) -> RunListResponse:
     """List recent runs with pagination and consolidation."""
+    # Validate pagination parameters
+    if page < 1:
+        page = 1
+    if page > MAX_PAGE:
+        raise HTTPException(status_code=400, detail=f"page cannot exceed {MAX_PAGE}")
+    if page_size < 1:
+        page_size = 1
+    if page_size > MAX_PAGE_SIZE:
+        raise HTTPException(status_code=400, detail=f"page_size cannot exceed {MAX_PAGE_SIZE}")
+
     # Get more runs than needed to handle filtering and consolidation
     fetch_limit = page_size * 5
     offset = (page - 1) * page_size

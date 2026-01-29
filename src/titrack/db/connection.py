@@ -1,5 +1,6 @@
 """SQLite connection management with WAL mode."""
 
+import json
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -59,6 +60,9 @@ class Database:
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
             ("schema_version", str(SCHEMA_VERSION)),
         )
+
+        # Auto-seed items if table is empty (first run experience)
+        self._auto_seed_items(cursor)
 
     def _run_migrations(self, cursor: sqlite3.Cursor) -> None:
         """Run database migrations for schema changes."""
@@ -149,6 +153,60 @@ class Database:
             cursor.execute("DROP TABLE slot_state")
             cursor.execute("ALTER TABLE slot_state_new RENAME TO slot_state")
             print("Migration: Recreated slot_state table with player_id")
+
+    def _auto_seed_items(self, cursor: sqlite3.Cursor) -> None:
+        """
+        Auto-seed items table on first run if empty.
+
+        Loads items from bundled tlidb_items_seed_en.json for
+        immediate item name display without manual seeding.
+        """
+        # Check if items table has any data
+        result = cursor.execute("SELECT COUNT(*) FROM items").fetchone()
+        if result[0] > 0:
+            return  # Already seeded
+
+        # Try to find and load the seed file
+        try:
+            from titrack.config.paths import get_items_seed_path
+
+            seed_path = get_items_seed_path()
+            if not seed_path.exists():
+                print(f"Items seed file not found: {seed_path}")
+                return
+
+            with open(seed_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            items_data = data.get("items", [])
+            if not items_data:
+                print("No items found in seed file")
+                return
+
+            # Batch insert items
+            insert_sql = """
+                INSERT OR IGNORE INTO items
+                (config_base_id, name_en, name_cn, type_cn, icon_url, url_en, url_cn)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+
+            items_to_insert = []
+            for item in items_data:
+                items_to_insert.append((
+                    int(item["id"]),
+                    item.get("name_en"),
+                    item.get("name_cn"),
+                    item.get("type_cn"),
+                    item.get("img"),
+                    item.get("url_en"),
+                    item.get("url_cn"),
+                ))
+
+            cursor.executemany(insert_sql, items_to_insert)
+            print(f"Seeded {len(items_to_insert)} items from {seed_path.name}")
+
+        except Exception as e:
+            print(f"Failed to auto-seed items: {e}")
 
     def close(self) -> None:
         """Close database connection."""

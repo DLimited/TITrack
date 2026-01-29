@@ -51,9 +51,10 @@ def get_inventory(
 
     for config_id, quantity in totals.items():
         item = repo.get_item(config_id)
-        price = repo.get_price(config_id)
 
-        price_fe = price.price_fe if price else None
+        # Use effective price (cloud-first, local overrides if newer)
+        price_fe = repo.get_effective_price(config_id)
+
         # FE currency is worth 1:1
         if config_id == FE_CONFIG_BASE_ID:
             price_fe = 1.0
