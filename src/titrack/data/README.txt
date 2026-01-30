@@ -45,8 +45,10 @@ USAGE
 -----
 1. Run TITrack.exe
 2. If prompted, select your Torchlight Infinite game folder
-3. Start Torchlight Infinite and log into a character
-4. TITrack will automatically track your loot!
+3. In Torchlight Infinite, go to Settings and click "Enable Log"
+4. Log out to the character select screen, then log back in
+   IMPORTANT: Do NOT close the game - just log out and back in!
+5. TITrack will detect your character and start tracking loot
 
 To sync your existing inventory, open your in-game bag and click the
 Sort button - this updates TITrack with your current items.
