@@ -218,8 +218,11 @@ exit /b 0
             )
 
             # Exit current process to allow update
+            # Use os._exit() instead of sys.exit() because sys.exit() raises
+            # SystemExit which gets caught by FastAPI/uvicorn and doesn't
+            # actually terminate the process
             print("Exiting for update...")
-            sys.exit(0)
+            os._exit(0)
 
         except Exception as e:
             print(f"Failed to start update: {e}")
