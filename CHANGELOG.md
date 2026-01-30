@@ -57,6 +57,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Phase 3: Manual price editing UI, import/export
 - Phase 4: PyInstaller portable EXE packaging
 
+## [0.2.4] - 2026-01-30
+
+### Fixed
+- Version display now shows correct version (was stuck at 0.2.0)
+- Demiman Village zone now correctly shows as "Glacial Abyss - Demiman Village" (fixed suffix 36)
+- Zone names now work correctly at all Timemark levels (refactored to suffix-based lookup)
+
+### Changed
+- Updated README and help modals to clarify users must NOT close the game when relogging
+- Zone lookup uses `level_id % 100` suffix for ambiguous zones instead of exact LevelId matching
+
 ## [0.2.0] - 2026-01-26
 
 ### Added
