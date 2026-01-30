@@ -51,6 +51,7 @@
                     </label>
                     <span id="cloud-sync-status" class="cloud-status-indicator" title="Cloud sync status"></span>
                 </div>
+                <button class="settings-btn" onclick="openSettingsModal()" title="Settings">&#9881;</button>
                 <button class="help-btn" onclick="openHelpModal()">Instructions</button>
                 <button id="reset-stats-btn" class="reset-btn" onclick="resetStats()">Reset Stats</button>
                 <label class="toggle">
@@ -248,12 +249,16 @@
     <div id="log-path-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Game Log File Not Found</h3>
+                <h3 id="log-path-modal-title">Game Log File Not Found</h3>
                 <button class="close-btn" onclick="closeLogPathModal()">&times;</button>
             </div>
             <div class="help-body">
-                <section class="help-section">
+                <section class="help-section" id="log-path-description">
                     <p>TITrack could not find the Torchlight Infinite log file. This usually means the game is installed in a non-standard location.</p>
+                </section>
+                <section class="help-section" id="log-path-current" style="display: none;">
+                    <h4>Current Configuration</h4>
+                    <p>Log file: <code id="current-log-path">Not configured</code></p>
                 </section>
                 <section class="help-section">
                     <h4>Configure Game Directory</h4>

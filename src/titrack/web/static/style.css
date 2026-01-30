@@ -328,7 +328,8 @@ tbody tr:last-child td {
 }
 
 .reset-btn,
-.help-btn {
+.help-btn,
+.settings-btn {
     background: none;
     border: 1px solid var(--border);
     color: var(--text-secondary);
@@ -337,6 +338,11 @@ tbody tr:last-child td {
     cursor: pointer;
     font-size: 0.85rem;
     transition: all 0.2s;
+}
+
+.settings-btn {
+    font-size: 1.1rem;
+    padding: 4px 10px;
 }
 
 .reset-btn:hover {
@@ -349,8 +355,14 @@ tbody tr:last-child td {
     color: #64b5f6;
 }
 
+.settings-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 .reset-btn:disabled,
-.help-btn:disabled {
+.help-btn:disabled,
+.settings-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }

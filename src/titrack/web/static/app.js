@@ -480,16 +480,70 @@ document.addEventListener('click', (e) => {
 
 let logPathModalShown = false;
 let validatedLogPath = null;
+let logPathReconfigureMode = false;
 
-function showLogPathModal() {
-    // Only show once per session
-    if (logPathModalShown) return;
-    logPathModalShown = true;
+function showLogPathModal(reconfigure = false) {
+    // Only show once per session for auto-popup mode
+    if (!reconfigure && logPathModalShown) return;
+    if (!reconfigure) logPathModalShown = true;
+
+    logPathReconfigureMode = reconfigure;
+
+    const titleEl = document.getElementById('log-path-modal-title');
+    const descEl = document.getElementById('log-path-description');
+    const currentEl = document.getElementById('log-path-current');
+    const currentPathEl = document.getElementById('current-log-path');
+    const statusEl = document.getElementById('log-path-status');
+    const inputEl = document.getElementById('log-directory-input');
+    const saveBtn = document.getElementById('save-log-dir-btn');
+
+    // Reset state
+    statusEl.textContent = '';
+    statusEl.className = 'log-path-status';
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Save & Restart';
+    validatedLogPath = null;
+
+    if (reconfigure) {
+        titleEl.textContent = 'Game Directory Settings';
+        descEl.innerHTML = '<p>Change the Torchlight Infinite game directory if the current configuration is incorrect.</p>';
+        currentEl.style.display = 'block';
+
+        // Fetch current log path from status
+        fetch(`${API_BASE}/status`)
+            .then(r => r.json())
+            .then(status => {
+                if (status.log_path) {
+                    currentPathEl.textContent = status.log_path;
+                    // Extract game directory from full path (remove UE_Game\Torchlight\Saved\Logs\UE_game.log)
+                    const pathParts = status.log_path.split('\\');
+                    if (pathParts.length > 5) {
+                        const gameDir = pathParts.slice(0, -5).join('\\');
+                        inputEl.value = gameDir;
+                    }
+                } else {
+                    currentPathEl.textContent = 'Not found - please configure below';
+                }
+            })
+            .catch(() => {
+                currentPathEl.textContent = 'Unable to fetch current path';
+            });
+    } else {
+        titleEl.textContent = 'Game Log File Not Found';
+        descEl.innerHTML = '<p>TITrack could not find the Torchlight Infinite log file. This usually means the game is installed in a non-standard location.</p>';
+        currentEl.style.display = 'none';
+        inputEl.value = '';
+    }
+
     document.getElementById('log-path-modal').classList.remove('hidden');
 }
 
 function closeLogPathModal() {
     document.getElementById('log-path-modal').classList.add('hidden');
+}
+
+function openSettingsModal() {
+    showLogPathModal(true);
 }
 
 // Close log-path modal on outside click
