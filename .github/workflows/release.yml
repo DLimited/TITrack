@@ -1,9 +1,13 @@
 name: Build and Release
 
+# DISABLED: Manual releases are more reliable for now
+# The PyInstaller build on GitHub Actions produces incomplete packages
+# Re-enable once the build differences are resolved
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:  # Manual trigger only
+  # push:
+  #   tags:
+  #     - 'v*'
 
 permissions:
   contents: write
