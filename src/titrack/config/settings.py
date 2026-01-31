@@ -18,10 +18,13 @@ STEAM_PATHS = [
     Path("F:/SteamLibrary/steamapps/common/Torchlight Infinite"),
     Path("G:/Steam/steamapps/common/Torchlight Infinite"),
     Path("G:/SteamLibrary/steamapps/common/Torchlight Infinite"),
+    Path.home() / Path(".local/share/Steam/steamapps/common/Torchlight Infinite"),
 ]
 
 # Relative path to log file within game directory
 LOG_RELATIVE_PATH = Path("UE_Game/Torchlight/Saved/Logs/UE_game.log")
+if os.name == 'posix':
+    LOG_RELATIVE_PATH = Path("UE_game/TorchLight/Saved/Logs/UE_game.log")
 
 
 def find_log_file(custom_game_dir: Optional[str] = None) -> Optional[Path]:
@@ -61,10 +64,12 @@ def validate_game_directory(game_dir: str) -> tuple[bool, Optional[Path]]:
         Tuple of (is_valid, log_path) where log_path is the full path if valid
     """
     game_path = Path(game_dir)
+    print(f"game path: {game_path}")
     if not game_path.exists():
         return False, None
 
     log_path = game_path / LOG_RELATIVE_PATH
+    print(f"log path: {log_path}")
     if log_path.exists():
         return True, log_path
 
